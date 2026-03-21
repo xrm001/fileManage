@@ -74,8 +74,9 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 启动服务器
-app.listen(PORT, () => {
-    console.log(`服务器运行在 http://localhost:${PORT}`);
+// 启动服务器 - 监听所有网络接口
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+    console.log(`服务器运行在 http://184.72.90.1:${PORT}`);
     console.log(`数据库连接: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
 });
