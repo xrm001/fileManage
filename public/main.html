@@ -211,22 +211,50 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
+            table-layout: fixed;
         }
 
         .file-table th {
             background: #f5f5f5;
-            padding: 12px;
+            padding: 12px 8px;
             text-align: left;
             font-weight: 600;
             color: #333;
             border-bottom: 1px solid #e8e8e8;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
+        .file-table th:nth-child(1) { width: 50px; }
+        .file-table th:nth-child(2) { width: 150px; }
+        .file-table th:nth-child(3) { width: 60px; }
+        .file-table th:nth-child(4) { width: 200px; }
+        .file-table th:nth-child(5) { width: 80px; }
+        .file-table th:nth-child(6) { width: 100px; }
+        .file-table th:nth-child(7) { width: 80px; }
+        .file-table th:nth-child(8) { width: 140px; }
+        .file-table th:nth-child(9) { width: 110px; }
+        .file-table th:nth-child(10) { width: 220px; }
+
         .file-table td {
-            padding: 12px;
+            padding: 12px 8px;
             border-bottom: 1px solid #f0f0f0;
             vertical-align: middle;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-table td:nth-child(4) {
+            width: 200px;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .file-table td:nth-child(9) {
+            text-align: center;
         }
 
         .file-table tr:hover {
@@ -788,6 +816,8 @@
         let pageSize = 20;
         // 当前选中的文件类型
         let currentType = 'all';
+        // 总记录数
+        let totalCount = 0;
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -867,7 +897,7 @@
                             ).join('')}
                         </select>
                     </td>
-                    <td><input type="text" class="form-input" placeholder="请输入文件描述" onchange="updateFileDesc(${file.id}, this.value)" style="width: 100%;"></td>
+                    <td><textarea class="form-textarea" placeholder="请输入文件描述" onchange="updateFileDesc(${file.id}, this.value)" style="width: 100%; min-height: 60px;"></textarea></td>
                     <td>
                         <button class="btn btn-danger" onclick="removeUploadFile(${file.id})">删除</button>
                     </td>
@@ -958,11 +988,45 @@
         }
 
         // 加载文件列表
-        function loadFileList() {
-            // TODO: 调用API获取文件列表
-            // 模拟数据
-            fileListData = [];
-            renderFileList();
+        async function loadFileList() {
+            const username = localStorage.getItem('username');
+            if (!username) return;
+            
+            const params = new URLSearchParams({
+                username: username,
+                type: currentType,
+                page: currentPage,
+                pageSize: pageSize
+            });
+            
+            // 添加搜索参数
+            const keyword = document.getElementById('searchKeyword').value;
+            const uploader = document.getElementById('searchUploader').value;
+            const dept = document.getElementById('searchDept').value;
+            const startDate = document.getElementById('searchStartDate').value;
+            const endDate = document.getElementById('searchEndDate').value;
+            
+            if (keyword) params.append('keyword', keyword);
+            if (uploader) params.append('uploader', uploader);
+            if (dept) params.append('dept', dept);
+            if (startDate) params.append('startDate', startDate);
+            if (endDate) params.append('endDate', endDate);
+            
+            try {
+                const response = await fetch(`/api/files?${params}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    fileListData = result.files;
+                    totalCount = result.total;
+                    renderFileList();
+                } else {
+                    showErrorToast(result.message || '加载失败');
+                }
+            } catch (error) {
+                console.error('加载错误:', error);
+                showErrorToast('加载失败');
+            }
         }
 
         // 渲染文件列表
@@ -989,22 +1053,24 @@
             const end = start + pageSize;
             const pageData = filteredData.slice(start, end);
             
-            tbody.innerHTML = pageData.map(file => {
-                const typeConfig = fileTypeMap[file.type] || fileTypeMap['other'];
+            tbody.innerHTML = fileListData.map(file => {
+                const typeKey = Object.keys(fileTypeMap).find(key => fileTypeMap[key].name === file.type) || 'other';
+                const typeConfig = fileTypeMap[typeKey] || fileTypeMap['other'];
+                const isImage = file.type === '图片';
                 return `
                     <tr>
                         <td>${file.id}</td>
                         <td>${file.file_name}</td>
-                        <td><span class="type-tag ${typeConfig.class}">${typeConfig.name}</span></td>
+                        <td><span class="type-tag ${typeConfig.class}">${file.type}</span></td>
                         <td>${file.file_descrip || '-'}</td>
-                        <td>${file.uploader_name}</td>
-                        <td>${file.dept_name}</td>
+                        <td>${file.uploader}</td>
+                        <td>${file.department || '-'}</td>
                         <td>${formatFileSize(file.size)}</td>
-                        <td>${file.upload_time}</td>
-                        <td>${file.type === 'image' ? `<img src="${file.url}" class="thumbnail">` : '-'}</td>
+                        <td>${formatDate(file.upload_time)}</td>
+                        <td>${isImage ? `<img src="${file.url}" class="thumbnail" style="width: 100px; height: 100px; object-fit: contain;">` : '-'}</td>
                         <td>
                             <div class="action-btns">
-                                <button class="btn btn-default" onclick="copyUrl('${file.url}')">复制URL</button>
+                                <button class="btn btn-default" onclick="copyUrl('${file.url}')">复制url</button>
                                 <button class="btn btn-default" onclick="downloadFile('${file.url}')">下载</button>
                                 <button class="btn btn-primary" onclick="openEditModal(${file.id})">修改</button>
                                 <button class="btn btn-danger" onclick="openDeleteModal(${file.id})">删除</button>
@@ -1014,7 +1080,7 @@
                 `;
             }).join('');
             
-            document.getElementById('totalCount').textContent = filteredData.length;
+            document.getElementById('totalCount').textContent = totalCount;
             document.getElementById('currentPage').textContent = currentPage;
         }
 
@@ -1025,6 +1091,13 @@
             const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 格式化日期
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN');
         }
 
         // 按类型筛选
@@ -1038,14 +1111,13 @@
             });
             event.target.classList.add('active');
             
-            renderFileList();
+            loadFileList();
         }
 
         // 搜索文件
         function searchFiles() {
             currentPage = 1;
-            // TODO: 实现搜索逻辑
-            renderFileList();
+            loadFileList();
         }
 
         // 重置搜索
@@ -1056,23 +1128,23 @@
             document.getElementById('searchStartDate').value = '';
             document.getElementById('searchEndDate').value = '';
             currentPage = 1;
-            renderFileList();
+            loadFileList();
         }
 
         // 上一页
         function prevPage() {
             if (currentPage > 1) {
                 currentPage--;
-                renderFileList();
+                loadFileList();
             }
         }
 
         // 下一页
         function nextPage() {
-            const totalPages = Math.ceil(fileListData.length / pageSize);
+            const totalPages = Math.ceil(totalCount / pageSize);
             if (currentPage < totalPages) {
                 currentPage++;
-                renderFileList();
+                loadFileList();
             }
         }
 
@@ -1080,19 +1152,25 @@
         function changePageSize() {
             pageSize = parseInt(document.getElementById('pageSize').value);
             currentPage = 1;
-            renderFileList();
+            loadFileList();
         }
 
         // 复制URL
         function copyUrl(url) {
             navigator.clipboard.writeText(url).then(() => {
-                alert('URL已复制');
+                showSuccessToast('URL已复制');
             });
         }
 
         // 下载文件
         function downloadFile(url) {
-            window.open(url, '_blank');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         // 打开修改弹窗
@@ -1109,11 +1187,39 @@
         }
 
         // 保存修改
-        function saveEdit() {
+        async function saveEdit() {
             const fileId = document.getElementById('editModal').dataset.fileId;
-            // TODO: 调用API保存修改
-            closeModal('editModal');
-            loadFileList();
+            const username = localStorage.getItem('username');
+            
+            const fileName = document.getElementById('editFileName').value;
+            const fileType = document.getElementById('editFileType').value;
+            const fileDescrip = document.getElementById('editFileDesc').value;
+            
+            try {
+                const response = await fetch(`/api/files/${fileId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        fileName: fileName,
+                        fileType: fileType,
+                        fileDescrip: fileDescrip
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccessToast('修改成功');
+                    closeModal('editModal');
+                    loadFileList();
+                } else {
+                    showErrorToast(result.message || '修改失败');
+                }
+            } catch (error) {
+                console.error('修改错误:', error);
+                showErrorToast('修改失败');
+            }
         }
 
         // 打开删除弹窗
@@ -1123,11 +1229,28 @@
         }
 
         // 确认删除
-        function confirmDelete() {
+        async function confirmDelete() {
             const fileId = document.getElementById('deleteModal').dataset.fileId;
-            // TODO: 调用API删除文件
-            closeModal('deleteModal');
-            loadFileList();
+            const username = localStorage.getItem('username');
+            
+            try {
+                const response = await fetch(`/api/files/${fileId}?username=${username}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccessToast('删除成功');
+                    closeModal('deleteModal');
+                    loadFileList();
+                } else {
+                    showErrorToast(result.message || '删除失败');
+                }
+            } catch (error) {
+                console.error('删除错误:', error);
+                showErrorToast('删除失败');
+            }
         }
 
         // 显示弹窗
@@ -1159,6 +1282,18 @@
             toast.classList.add('show');
             setTimeout(() => {
                 toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // 显示错误提示弹框
+        function showErrorToast(message) {
+            const toast = document.getElementById('successToast');
+            toast.textContent = message;
+            toast.style.background = '#dc3545';
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.style.background = '#28a745';
             }, 2000);
         }
 
