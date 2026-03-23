@@ -2,9 +2,22 @@ require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 const path = require('path');
+const AWS = require('aws-sdk');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+// 配置 AWS S3（从环境变量读取）
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION
+});
+const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
+
+// 配置 multer 用于文件上传
+const upload = multer({ storage: multer.memoryStorage() });
 
 // 中间件
 app.use(express.json());
@@ -71,6 +84,88 @@ app.post('/api/login', async (req, res) => {
             success: false,
             message: '服务器错误，请稍后重试'
         });
+    }
+});
+
+// 文件上传 API
+app.post('/api/upload', upload.array('files'), async (req, res) => {
+    const { fileNames, fileTypes, fileIntros, username } = req.body;
+    const files = req.files;
+
+    console.log('S3_BUCKET_NAME:', S3_BUCKET_NAME);
+
+    if (!files || files.length === 0) {
+        return res.json({ success: false, message: '请选择文件' });
+    }
+
+    // 处理数组参数
+    const names = Array.isArray(fileNames) ? fileNames : [fileNames];
+    const types = Array.isArray(fileTypes) ? fileTypes : [fileTypes];
+    const intros = Array.isArray(fileIntros) ? fileIntros : [fileIntros];
+    
+    try {
+        // 获取用户信息
+        const [userRows] = await pool.execute(
+            'SELECT id FROM person WHERE name = ?',
+            [username]
+        );
+        if (userRows.length === 0) {
+            return res.json({ success: false, message: '用户不存在' });
+        }
+        const persId = userRows[0].id;
+
+        const uploadResults = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const fileName = names[i] || file.originalname;
+            const fileType = types[i] || '其他';
+            const fileIntro = intros[i] || null;
+
+            // 文件类型映射（不查询数据库）
+            const typeMap = {
+                'word': 1, 'excel': 2, 'ppt': 3, 'pdf': 4,
+                'image': 5, '3d': 6, 'video': 7, 'audio': 8, 'other': 9
+            };
+            const typeId = typeMap[fileType] || 9;
+
+            // S3 key: 用户名/文件类型/文件名
+            const s3Key = `${username}/${fileType}/${fileName}`;
+
+            // 上传到 S3
+            const s3Params = {
+                Bucket: S3_BUCKET_NAME,
+                Key: s3Key,
+                Body: file.buffer,
+                ContentType: file.mimetype
+            };
+
+            const s3Result = await s3.upload(s3Params).promise();
+
+            // 插入数据库（使用 upload_time 字段）
+            const [insertResult] = await pool.execute(
+                'INSERT INTO files (file_name, type, file_descrip, pers_id, size, upload_time, url) VALUES (?, ?, ?, ?, ?, NOW(), ?)',
+                [fileName, typeId, fileIntro, persId, file.size, s3Result.Location]
+            );
+
+            uploadResults.push({
+                id: insertResult.insertId,
+                fileName: fileName,
+                url: s3Result.Location,
+                size: file.size,
+                uploadTime: new Date().toISOString()
+            });
+        }
+
+        res.json({
+            success: true,
+            message: '上传成功',
+            files: uploadResults
+        });
+
+    } catch (error) {
+        console.error('上传错误:', error);
+        res.status(500).json({ success: false, message: '上传失败: ' + error.message });
     }
 });
 

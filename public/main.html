@@ -525,9 +525,51 @@
             animation: spin 1s linear infinite;
         }
 
+        /* 按钮内小旋转圆环 */
+        .btn .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        /* 红底白字成功提示弹框 */
+        .success-toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #dc3545;
+            color: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            z-index: 3000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .success-toast.show {
+            display: block;
+            animation: fadeInOut 2s ease;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
         }
     </style>
 </head>
@@ -547,7 +589,7 @@
         <section class="card upload-section">
             <div class="card-header">
                 <div class="card-title">文件上传</div>
-                <button class="btn btn-primary" onclick="submitUpload()">提交上传</button>
+                <button class="btn btn-primary" onclick="submitUpload()" id="uploadBtn"><span id="uploadLoading" style="display: none;"><span class="spinner"></span></span>提交上传</button>
             </div>
             <div class="upload-content">
                 <div class="upload-area">
@@ -718,6 +760,9 @@
     <div class="loading" id="loading">
         <div class="spinner"></div>
     </div>
+
+    <!-- 成功提示弹框 -->
+    <div class="success-toast" id="successToast">上传成功</div>
 
     <script>
         // 文件类型映射
@@ -898,7 +943,7 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('上传成功');
+                    showSuccessToast('上传成功');
                     uploadFiles = [];
                     renderUploadList();
                     loadFileList();
@@ -1095,14 +1140,26 @@
             document.getElementById(modalId).classList.remove('show');
         }
 
-        // 显示加载
+        // 显示加载（仅在按钮上显示）
         function showLoading() {
-            document.getElementById('loading').classList.add('show');
+            document.getElementById('uploadLoading').style.display = 'inline';
+            document.getElementById('uploadBtn').disabled = true;
         }
 
         // 隐藏加载
         function hideLoading() {
-            document.getElementById('loading').classList.remove('show');
+            document.getElementById('uploadLoading').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = false;
+        }
+
+        // 显示成功提示弹框
+        function showSuccessToast(message) {
+            const toast = document.getElementById('successToast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
         }
 
         // 退出登录
