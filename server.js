@@ -89,7 +89,7 @@ app.post('/api/login', async (req, res) => {
 
 // 文件上传 API
 app.post('/api/upload', upload.array('files'), async (req, res) => {
-    const { fileNames, fileTypes, fileIntros, username } = req.body;
+    const { username, files: filesJson } = req.body;
     const files = req.files;
 
     console.log('S3_BUCKET_NAME:', S3_BUCKET_NAME);
@@ -98,10 +98,13 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
         return res.json({ success: false, message: '请选择文件' });
     }
 
-    // 处理数组参数
-    const names = Array.isArray(fileNames) ? fileNames : [fileNames];
-    const types = Array.isArray(fileTypes) ? fileTypes : [fileTypes];
-    const intros = Array.isArray(fileIntros) ? fileIntros : [fileIntros];
+    // 解析前端发送的文件信息
+    let fileInfos = [];
+    try {
+        fileInfos = JSON.parse(filesJson || '[]');
+    } catch (e) {
+        fileInfos = [];
+    }
     
     try {
         // 获取用户信息
@@ -118,19 +121,29 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            const fileName = names[i] || file.originalname;
-            const fileType = types[i] || '其他';
-            const fileIntro = intros[i] || null;
+            const info = fileInfos[i] || {};
+            const fileName = info.name || file.originalname;
+            const fileType = info.type || 'other';
+            const fileIntro = info.description || null;
 
-            // 文件类型映射（不查询数据库）
+            // 文件类型映射（英文key -> {id, 中文名称}）
             const typeMap = {
-                'word': 1, 'excel': 2, 'ppt': 3, 'pdf': 4,
-                'image': 5, '3d': 6, 'video': 7, 'audio': 8, 'other': 9
+                'word': { id: 1, name: 'Word' },
+                'excel': { id: 2, name: 'Excel' },
+                'ppt': { id: 3, name: 'PPT' },
+                'pdf': { id: 4, name: 'PDF' },
+                'image': { id: 5, name: '图片' },
+                '3d': { id: 6, name: '3D模型' },
+                'video': { id: 7, name: '视频' },
+                'audio': { id: 8, name: '音频' },
+                'other': { id: 9, name: '其他' }
             };
-            const typeId = typeMap[fileType] || 9;
+            const typeInfo = typeMap[fileType] || typeMap['other'];
+            const typeId = typeInfo.id;
+            const typeName = typeInfo.name;
 
-            // S3 key: 用户名/文件类型/文件名
-            const s3Key = `${username}/${fileType}/${fileName}`;
+            // S3 key: 用户名/文件类型中文名/文件名
+            const s3Key = `${username}/${typeName}/${fileName}`;
 
             // 上传到 S3
             const s3Params = {
@@ -142,10 +155,10 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 
             const s3Result = await s3.upload(s3Params).promise();
 
-            // 插入数据库（使用 upload_time 字段）
+            // 插入数据库（type 字段存储文件类型中文名）
             const [insertResult] = await pool.execute(
                 'INSERT INTO files (file_name, type, file_descrip, pers_id, size, upload_time, url) VALUES (?, ?, ?, ?, ?, NOW(), ?)',
-                [fileName, typeId, fileIntro, persId, file.size, s3Result.Location]
+                [fileName, typeName, fileIntro, persId, file.size, s3Result.Location]
             );
 
             uploadResults.push({
