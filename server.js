@@ -4,7 +4,7 @@ const mysql = require('mysql2/promise');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // 中间件
 app.use(express.json());
@@ -31,7 +31,7 @@ app.post('/api/login', async (req, res) => {
     if (!username || !password) {
         return res.json({
             success: false,
-            message: '用户名或密码不能为空'
+            message: '用户名和密码不能为空'
         });
     }
 
@@ -74,9 +74,8 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 启动服务器 - 监听所有网络接口
-const HOST = '0.0.0.0';
-app.listen(PORT, HOST, () => {
-    console.log(`服务器运行在 http://184.72.90.1:${PORT}`);
+// 启动服务器 - 仅本地运行
+app.listen(PORT, () => {
+    console.log(`服务器运行在 http://localhost:${PORT}`);
     console.log(`数据库连接: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
 });

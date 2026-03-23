@@ -161,8 +161,9 @@
                 if (result.success) {
                     messageDiv.className = 'message success';
                     messageDiv.textContent = result.message;
-                    // 可以在这里添加跳转逻辑
-                    // setTimeout(() => window.location.href = '/dashboard', 1000);
+                    // 保存用户名并跳转到主页面
+                    localStorage.setItem('username', username);
+                    setTimeout(() => window.location.href = '/main.html', 1000);
                 } else {
                     messageDiv.className = 'message error';
                     messageDiv.textContent = result.message;

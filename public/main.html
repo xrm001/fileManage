@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部标题栏 */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* 主内容区 */
+        .main-container {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        /* 通用卡片样式 */
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .card-header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-input-inline {
+            padding: 6px 10px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 140px;
+        }
+
+        .search-input-inline::placeholder {
+            font-style: italic;
+            color: #999;
+        }
+
+        .search-date-inline {
+            padding: 6px 10px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 120px;
+        }
+
+        .btn-small {
+            padding: 6px 14px;
+            font-size: 13px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+
+        /* 文件上传区域 */
+        .upload-section {
+            flex: 0 0 auto;
+        }
+
+        .upload-content {
+            padding: 20px;
+        }
+
+        .upload-area {
+            display: flex;
+            gap: 20px;
+        }
+
+        /* 拖拽上传框 */
+        .drop-zone {
+            width: 200px;
+            height: 200px;
+            border: 2px dashed #d9d9d9;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .drop-zone:hover {
+            border-color: #667eea;
+            background: #f0f5ff;
+        }
+
+        .drop-zone.dragover {
+            border-color: #667eea;
+            background: #e6f0ff;
+        }
+
+        .drop-zone .icon {
+            font-size: 48px;
+            color: #bfbfbf;
+            margin-bottom: 10px;
+        }
+
+        .drop-zone .text {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+
+        .drop-zone .hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        /* 文件列表表格 */
+        .file-list-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-table-wrapper {
+            flex: 1;
+            overflow: auto;
+            padding: 0 20px 20px;
+        }
+
+        .file-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .file-table th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 1px solid #e8e8e8;
+            white-space: nowrap;
+        }
+
+        .file-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+
+        .file-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        /* 类型标签 */
+        .type-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .type-word { background: #e6f7ff; color: #1890ff; }
+        .type-excel { background: #f6ffed; color: #52c41a; }
+        .type-ppt { background: #fff2e8; color: #fa8c16; }
+        .type-pdf { background: #fff1f0; color: #f5222d; }
+        .type-image { background: #f9f0ff; color: #722ed1; }
+        .type-3d { background: #e6fffb; color: #13c2c2; }
+        .type-video { background: #fcffe6; color: #a0d911; }
+        .type-audio { background: #fff0f6; color: #eb2f96; }
+        .type-other { background: #f5f5f5; color: #666; }
+
+        /* 操作按钮 */
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 4px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-default {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .btn-default:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: #ff4d4f;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff7875;
+        }
+
+        /* 标签筛选 */
+        .type-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            flex-wrap: wrap;
+        }
+
+        .type-tab {
+            padding: 6px 16px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .type-tab:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .type-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        /* 搜索区域 */
+        .search-area {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .search-input::placeholder {
+            font-style: italic;
+            color: #999;
+        }
+
+        /* 分页 */
+        .pagination {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #e8e8e8;
+        }
+
+        .page-info {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .page-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .page-btn {
+            padding: 6px 12px;
+            border: 1px solid #d9d9d9;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-size-select {
+            padding: 6px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            background: white;
+        }
+
+        /* 缩略图 */
+        .thumbnail {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #e8e8e8;
+        }
+
+        /* 弹窗 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e8e8e8;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state .icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        /* 加载状态 */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .loading.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部标题栏 -->
+    <header class="header">
+        <h1>文件管理系统</h1>
+        <div class="user-info">
+            <span id="currentUser">欢迎，</span>
+            <button class="logout-btn" onclick="logout()">退出登录</button>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main-container">
+        <!-- 文件上传区域 -->
+        <section class="card upload-section">
+            <div class="card-header">
+                <div class="card-title">文件上传</div>
+                <button class="btn btn-primary" onclick="submitUpload()">提交上传</button>
+            </div>
+            <div class="upload-content">
+                <div class="upload-area">
+                    <!-- 拖拽上传框 -->
+                    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                        <div class="icon">+</div>
+                        <div class="text">点击或拖拽文件到此处上传</div>
+                        <div class="hint">支持多文件上传</div>
+                        <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
+                    </div>
+                    
+                    <!-- 文件列表表格 -->
+                    <div style="flex: 1;">
+                        <table class="file-table" id="uploadTable">
+                            <thead>
+                                <tr>
+                                    <th>文件名</th>
+                                    <th>文件类型</th>
+                                    <th>文件描述</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="uploadList">
+                                <!-- 动态添加 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 文件列表区域 -->
+        <section class="card file-list-container">
+            <div class="card-header">
+                <div class="card-header-left">
+                    <div class="card-title">文件列表</div>
+                </div>
+                <div class="card-header-right">
+                    <input type="text" class="search-input-inline" placeholder="文件名、描述...模糊搜索" id="searchKeyword">
+                    <input type="text" class="search-input-inline" placeholder="上传人" id="searchUploader">
+                    <input type="text" class="search-input-inline" placeholder="部门" id="searchDept">
+                    <input type="date" class="search-date-inline" id="searchStartDate">
+                    <span>至</span>
+                    <input type="date" class="search-date-inline" id="searchEndDate">
+                    <button class="btn btn-primary btn-small" onclick="searchFiles()">搜索</button>
+                    <button class="btn btn-default btn-small" onclick="resetSearch()">重置</button>
+                </div>
+            </div>
+
+            <!-- 类型标签筛选 -->
+            <div class="type-tabs">
+                <div class="type-tab active" onclick="filterByType('all')">全部</div>
+                <div class="type-tab" onclick="filterByType('word')">Word</div>
+                <div class="type-tab" onclick="filterByType('excel')">Excel</div>
+                <div class="type-tab" onclick="filterByType('ppt')">PPT</div>
+                <div class="type-tab" onclick="filterByType('pdf')">PDF</div>
+                <div class="type-tab" onclick="filterByType('image')">图片</div>
+                <div class="type-tab" onclick="filterByType('3d')">3D模型</div>
+                <div class="type-tab" onclick="filterByType('video')">视频</div>
+                <div class="type-tab" onclick="filterByType('audio')">音频</div>
+                <div class="type-tab" onclick="filterByType('other')">其他</div>
+            </div>
+
+            <!-- 文件表格 -->
+            <div class="file-table-wrapper">
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th>编号</th>
+                            <th>文件名</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                            <th>上传人</th>
+                            <th>部门</th>
+                            <th>文件大小</th>
+                            <th>上传时间</th>
+                            <th>缩略图</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fileList">
+                        <!-- 动态添加 -->
+                    </tbody>
+                </table>
+                
+                <!-- 空状态 -->
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <div class="icon">📁</div>
+                    <p>暂无文件</p>
+                </div>
+            </div>
+
+            <!-- 分页 -->
+            <div class="pagination">
+                <div class="page-info">
+                    共 <span id="totalCount">0</span> 条记录
+                </div>
+                <div class="page-controls">
+                    <button class="page-btn" onclick="prevPage()">上一页</button>
+                    <span>第 <span id="currentPage">1</span> 页</span>
+                    <button class="page-btn" onclick="nextPage()">下一页</button>
+                    <select class="page-size-select" id="pageSize" onchange="changePageSize()">
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 修改弹窗 -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">修改文件信息</div>
+                <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">文件名</label>
+                    <input type="text" class="form-input" id="editFileName">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">文件类型</label>
+                    <select class="form-select" id="editFileType">
+                        <option value="word">Word</option>
+                        <option value="excel">Excel</option>
+                        <option value="ppt">PPT</option>
+                        <option value="pdf">PDF</option>
+                        <option value="image">图片</option>
+                        <option value="3d">3D模型</option>
+                        <option value="video">视频</option>
+                        <option value="audio">音频</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">文件描述</label>
+                    <textarea class="form-textarea" id="editFileDesc"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeModal('editModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEdit()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">确认删除</div>
+                <button class="modal-close" onclick="closeModal('deleteModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>确定要删除该文件吗？此操作不可恢复。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeModal('deleteModal')">取消</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        // 文件类型映射
+        const fileTypeMap = {
+            'word': { name: 'Word', class: 'type-word', extensions: ['doc', 'docx'] },
+            'excel': { name: 'Excel', class: 'type-excel', extensions: ['xls', 'xlsx', 'csv'] },
+            'ppt': { name: 'PPT', class: 'type-ppt', extensions: ['ppt', 'pptx'] },
+            'pdf': { name: 'PDF', class: 'type-pdf', extensions: ['pdf'] },
+            'image': { name: '图片', class: 'type-image', extensions: ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tif', 'tiff', 'webp', 'psd', 'ai', 'svg'] },
+            '3d': { name: '3D模型', class: 'type-3d', extensions: ['obj', 'fbx', 'stl', '3ds', 'c4d', 'glb', 'blend'] },
+            'video': { name: '视频', class: 'type-video', extensions: ['mp4', 'avi', 'wmv', 'mov', 'flv', 'webm', 'm4v', 'mkv'] },
+            'audio': { name: '音频', class: 'type-audio', extensions: ['mp3', 'wav', 'aac', 'm4a', 'flac'] },
+            'other': { name: '其他', class: 'type-other', extensions: [] }
+        };
+
+        // 当前上传的文件列表
+        let uploadFiles = [];
+        // 当前文件列表数据
+        let fileListData = [];
+        // 当前页码
+        let currentPage = 1;
+        // 每页条数
+        let pageSize = 20;
+        // 当前选中的文件类型
+        let currentType = 'all';
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查登录状态
+            const username = localStorage.getItem('username');
+            if (!username) {
+                window.location.href = '/index.html';
+                return;
+            }
+            document.getElementById('currentUser').textContent = '欢迎，' + username;
+            
+            initDropZone();
+            loadFileList();
+        });
+
+        // 初始化拖拽区域
+        function initDropZone() {
+            const dropZone = document.getElementById('dropZone');
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            });
+        }
+
+        // 处理文件选择
+        function handleFileSelect(event) {
+            handleFiles(event.target.files);
+        }
+
+        // 处理文件
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                const fileData = {
+                    id: Date.now() + Math.random(),
+                    file: file,
+                    name: file.name,
+                    type: detectFileType(file.name),
+                    description: ''
+                };
+                uploadFiles.push(fileData);
+            });
+            renderUploadList();
+        }
+
+        // 检测文件类型
+        function detectFileType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            for (const [type, config] of Object.entries(fileTypeMap)) {
+                if (config.extensions.includes(ext)) {
+                    return type;
+                }
+            }
+            return 'other';
+        }
+
+        // 渲染上传列表
+        function renderUploadList() {
+            const tbody = document.getElementById('uploadList');
+            tbody.innerHTML = uploadFiles.map(file => `
+                <tr>
+                    <td><input type="text" class="form-input" value="${file.name}" onchange="updateFileName(${file.id}, this.value)" style="width: 100%;"></td>
+                    <td>
+                        <select class="form-select" onchange="updateFileType(${file.id}, this.value)">
+                            ${Object.entries(fileTypeMap).map(([key, config]) => 
+                                `<option value="${key}" ${file.type === key ? 'selected' : ''}>${config.name}</option>`
+                            ).join('')}
+                        </select>
+                    </td>
+                    <td><input type="text" class="form-input" placeholder="请输入文件描述" onchange="updateFileDesc(${file.id}, this.value)" style="width: 100%;"></td>
+                    <td>
+                        <button class="btn btn-danger" onclick="removeUploadFile(${file.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 更新文件名
+        function updateFileName(id, name) {
+            const file = uploadFiles.find(f => f.id === id);
+            if (file) file.name = name;
+        }
+
+        // 更新文件类型
+        function updateFileType(id, type) {
+            const file = uploadFiles.find(f => f.id === id);
+            if (file) file.type = type;
+        }
+
+        // 更新文件描述
+        function updateFileDesc(id, desc) {
+            const file = uploadFiles.find(f => f.id === id);
+            if (file) file.description = desc;
+        }
+
+        // 删除上传文件
+        function removeUploadFile(id) {
+            uploadFiles = uploadFiles.filter(f => f.id !== id);
+            renderUploadList();
+        }
+
+        // 提交上传
+        async function submitUpload() {
+            if (uploadFiles.length === 0) {
+                alert('请先选择文件');
+                return;
+            }
+            // 检查必填项
+            for (const file of uploadFiles) {
+                if (!file.name.trim()) {
+                    alert('文件名不能为空');
+                    return;
+                }
+            }
+            
+            // 获取当前登录用户
+            const username = document.getElementById('currentUser').textContent.replace('欢迎，', '');
+            
+            showLoading();
+            
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                
+                // 添加文件信息
+                const fileInfos = uploadFiles.map(f => ({
+                    name: f.name,
+                    type: f.type,
+                    description: f.description
+                }));
+                formData.append('files', JSON.stringify(fileInfos));
+                
+                // 添加文件
+                uploadFiles.forEach(f => {
+                    formData.append('files', f.file);
+                });
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('上传成功');
+                    uploadFiles = [];
+                    renderUploadList();
+                    loadFileList();
+                } else {
+                    alert('上传失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('上传出错: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 加载文件列表
+        function loadFileList() {
+            // TODO: 调用API获取文件列表
+            // 模拟数据
+            fileListData = [];
+            renderFileList();
+        }
+
+        // 渲染文件列表
+        function renderFileList() {
+            const tbody = document.getElementById('fileList');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (fileListData.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            // 过滤数据
+            let filteredData = fileListData;
+            if (currentType !== 'all') {
+                filteredData = filteredData.filter(f => f.type === currentType);
+            }
+            
+            // 分页
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageData = filteredData.slice(start, end);
+            
+            tbody.innerHTML = pageData.map(file => {
+                const typeConfig = fileTypeMap[file.type] || fileTypeMap['other'];
+                return `
+                    <tr>
+                        <td>${file.id}</td>
+                        <td>${file.file_name}</td>
+                        <td><span class="type-tag ${typeConfig.class}">${typeConfig.name}</span></td>
+                        <td>${file.file_descrip || '-'}</td>
+                        <td>${file.uploader_name}</td>
+                        <td>${file.dept_name}</td>
+                        <td>${formatFileSize(file.size)}</td>
+                        <td>${file.upload_time}</td>
+                        <td>${file.type === 'image' ? `<img src="${file.url}" class="thumbnail">` : '-'}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-default" onclick="copyUrl('${file.url}')">复制URL</button>
+                                <button class="btn btn-default" onclick="downloadFile('${file.url}')">下载</button>
+                                <button class="btn btn-primary" onclick="openEditModal(${file.id})">修改</button>
+                                <button class="btn btn-danger" onclick="openDeleteModal(${file.id})">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('totalCount').textContent = filteredData.length;
+            document.getElementById('currentPage').textContent = currentPage;
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 按类型筛选
+        function filterByType(type) {
+            currentType = type;
+            currentPage = 1;
+            
+            // 更新标签样式
+            document.querySelectorAll('.type-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            renderFileList();
+        }
+
+        // 搜索文件
+        function searchFiles() {
+            currentPage = 1;
+            // TODO: 实现搜索逻辑
+            renderFileList();
+        }
+
+        // 重置搜索
+        function resetSearch() {
+            document.getElementById('searchKeyword').value = '';
+            document.getElementById('searchUploader').value = '';
+            document.getElementById('searchDept').value = '';
+            document.getElementById('searchStartDate').value = '';
+            document.getElementById('searchEndDate').value = '';
+            currentPage = 1;
+            renderFileList();
+        }
+
+        // 上一页
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderFileList();
+            }
+        }
+
+        // 下一页
+        function nextPage() {
+            const totalPages = Math.ceil(fileListData.length / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderFileList();
+            }
+        }
+
+        // 改变每页条数
+        function changePageSize() {
+            pageSize = parseInt(document.getElementById('pageSize').value);
+            currentPage = 1;
+            renderFileList();
+        }
+
+        // 复制URL
+        function copyUrl(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL已复制');
+            });
+        }
+
+        // 下载文件
+        function downloadFile(url) {
+            window.open(url, '_blank');
+        }
+
+        // 打开修改弹窗
+        function openEditModal(fileId) {
+            const file = fileListData.find(f => f.id === fileId);
+            if (!file) return;
+            
+            document.getElementById('editFileName').value = file.file_name;
+            document.getElementById('editFileType').value = file.type;
+            document.getElementById('editFileDesc').value = file.file_descrip || '';
+            
+            document.getElementById('editModal').dataset.fileId = fileId;
+            showModal('editModal');
+        }
+
+        // 保存修改
+        function saveEdit() {
+            const fileId = document.getElementById('editModal').dataset.fileId;
+            // TODO: 调用API保存修改
+            closeModal('editModal');
+            loadFileList();
+        }
+
+        // 打开删除弹窗
+        function openDeleteModal(fileId) {
+            document.getElementById('deleteModal').dataset.fileId = fileId;
+            showModal('deleteModal');
+        }
+
+        // 确认删除
+        function confirmDelete() {
+            const fileId = document.getElementById('deleteModal').dataset.fileId;
+            // TODO: 调用API删除文件
+            closeModal('deleteModal');
+            loadFileList();
+        }
+
+        // 显示弹窗
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        // 关闭弹窗
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        // 显示加载
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+
+        // 隐藏加载
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        // 退出登录
+        function logout() {
+            // TODO: 清除登录状态
+            window.location.href = '/index.html';
+        }
+    </script>
+</body>
+</html>
